@@ -1,0 +1,6 @@
+model: yolov8n.pt
+data: ../../dataset/candle_dataset.yaml
+epochs: 120
+imgsz: 640
+batch: 16
+name: candle_detector

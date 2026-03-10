@@ -1,0 +1,10 @@
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "H1",
+  "screenshot_url": "https://blossom.server/example-chart.png",
+  "account_balance": 10000,
+  "risk_per_trade_percent": 1.0,
+  "leverage": 3.0,
+  "minimum_rr": 2.0,
+  "context": "Intraday continuation setup"
+}

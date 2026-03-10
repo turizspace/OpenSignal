@@ -1,0 +1,50 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android
+local.properties
+*.keystore
+*.jks
+*.apk
+*.aab
+
+# Kotlin/Java
+*.class
+*.log
+
+# IntelliJ/Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if any)
+node_modules/
+
+# Logs
+*.log
+
+# Secrets
+*.env
+
+# Compose/desktop caches
+**/.compose/
+
+# Ktor/Temp
+**/tmp/
+
+# Bazel
+bazel-*
+
+# Gradle wrapper checksum cache
+.gradle-wrapper/
+
+# Nostr keys / sensitive data
+**/nsec*
+**/npub*

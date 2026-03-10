@@ -1,0 +1,16 @@
+repository: https://github.com/turizspace/opensignal
+name: OpenSignal
+summary: OpenSignal - AI trading copilot on Nostr
+description: OpenSignal is an AI-powered trading copilot built for the Nostr protocol. Upload chart screenshots for technical and fundamental analysis, publish trade signals as Nostr events, and manage risk with structured trade plans.
+icon: OpenSignal_logo.png
+license: MIT
+tags:
+  - nostr
+  - android
+  - trading
+  - ai
+  - charts
+remote_metadata:
+  - github
+assets:
+  - '.*\.apk'

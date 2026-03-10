@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.OpenSignal" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/open_signal_splash_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/open_signal_splash</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/open_signal_splash_bg</item>
+    </style>
+</resources>

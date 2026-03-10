@@ -1,0 +1,6 @@
+model: yolov8n.pt
+data: ../../dataset/structure_dataset.yaml
+epochs: 100
+imgsz: 640
+batch: 16
+name: structure_detector
