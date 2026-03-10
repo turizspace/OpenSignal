@@ -28,7 +28,7 @@ data class UserSettings(
         "wss://relay.damus.io",
         "wss://relay.primal.net"
     ),
-    val blossomServer: String = "https://buds.example",
+    val blossomServer: String = BlossomServerPresets.first().baseUrl,
     val aiServiceEndpoint: String = "http://localhost:8000/analyze",
     val candleModelPath: String = "",
     val liquidityModelPath: String = "",
