@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 .kotlin/
+.vscode/
 build/
 **/build/
 
