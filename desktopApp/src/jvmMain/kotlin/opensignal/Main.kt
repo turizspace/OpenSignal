@@ -19,7 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +30,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,10 +73,12 @@ import opensignal.domain.OpenSignalController
 import opensignal.domain.ScreenshotUploader
 import opensignal.domain.parseTimeframeOrDefault
 import opensignal.models.ScreenshotPayload
+import opensignal.models.ShareSection
 import opensignal.models.TradeOption
 import opensignal.models.TradeSide
 import opensignal.models.TrendDirection
 import opensignal.nostr.NostrClient
+import opensignal.nostr.OpenSignalNostrClient
 import opensignal.settings.InMemorySettingsRepository
 import opensignal.settings.SettingsRepository
 import opensignal.settings.ThemeMode
@@ -83,11 +86,18 @@ import opensignal.settings.UserSettings
 import opensignal.ui.login.ExternalSignerLoginCard
 import opensignal.ui.login.NsecLoginCard
 import opensignal.ui.settings.DesktopSettingsScreen
+import opensignal.ui.components.ShareSignalDialog
+import opensignal.ui.components.ShareFormat
+import opensignal.ui.components.ShareButton
+import opensignal.ui.history.DesktopHistoryScreen
+import opensignal.ui.share.ShareContent
+import opensignal.ui.share.buildShareContent
 
 private enum class DesktopRoute {
     LOGIN,
     UPLOAD,
-    SETTINGS
+    SETTINGS,
+    HISTORY
 }
 
 private const val ANALYSIS_SYSTEM_PROMPT =
@@ -169,7 +179,8 @@ fun main() = application {
             LuxuryShell {
                 DesktopCopilotScreen(
                     controller = controller,
-                    settingsRepository = settingsRepository
+                    settingsRepository = settingsRepository,
+                    nostrClient = nostrClient
                 )
             }
         }
@@ -187,7 +198,8 @@ private class SettingsAwareUploader(
 @Composable
 private fun DesktopCopilotScreen(
     controller: OpenSignalController,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    nostrClient: OpenSignalNostrClient
 ) {
     val scope = rememberCoroutineScope()
     val state by controller.state.collectAsState()
@@ -201,18 +213,20 @@ private fun DesktopCopilotScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TopBar(
             title = when (route) {
                 DesktopRoute.SETTINGS -> "Settings"
+                DesktopRoute.HISTORY -> "History"
                 else -> "OpenSignal Trading Copilot"
             },
             showSettings = route == DesktopRoute.UPLOAD,
             onSettings = { route = DesktopRoute.SETTINGS },
-            showBack = route == DesktopRoute.SETTINGS,
+            showHistory = route == DesktopRoute.UPLOAD,
+            onHistory = { route = DesktopRoute.HISTORY },
+            showBack = route == DesktopRoute.SETTINGS || route == DesktopRoute.HISTORY,
             onBack = { route = DesktopRoute.UPLOAD }
         )
 
@@ -234,6 +248,8 @@ private fun DesktopCopilotScreen(
             DesktopRoute.UPLOAD -> UploadScreenshotPredictionScreen(
                 state = state,
                 settings = settings,
+                nostrClient = nostrClient,
+                modifier = Modifier.weight(1f),
                 onUploadAndPredict = { bytes, fileName, mimeType ->
                     scope.launch {
                         val payload = ScreenshotPayload(
@@ -254,6 +270,10 @@ private fun DesktopCopilotScreen(
                 },
                 onUpdateSettings = { update ->
                     scope.launch { settingsRepository.update(update) }
+                },
+                onShare = { signal, selectedRelays ->
+                    // Handle share - in the future this could directly publish via nostrClient
+                    // For now, the signal is already prepared for sharing
                 }
             )
 
@@ -264,6 +284,16 @@ private fun DesktopCopilotScreen(
                 },
                 pickFile = ::pickFile
             )
+
+            DesktopRoute.HISTORY -> DesktopHistoryScreen(
+                history = state.analysisHistory,
+                settings = settings,
+                isLoggedIn = state.authSession != null,
+                onToggleTraining = { entryId, enabled ->
+                    controller.toggleHistoryTraining(entryId, enabled)
+                },
+                onClearHistory = { controller.clearHistory() }
+            )
         }
     }
 }
@@ -273,6 +303,8 @@ private fun TopBar(
     title: String,
     showSettings: Boolean,
     onSettings: () -> Unit,
+    showHistory: Boolean,
+    onHistory: () -> Unit,
     showBack: Boolean,
     onBack: () -> Unit
 ) {
@@ -298,15 +330,28 @@ private fun TopBar(
             modifier = Modifier.weight(1f)
         )
 
-        if (showSettings) {
-            IconButton(onClick = onSettings) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings"
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (showHistory) {
+                IconButton(onClick = onHistory) {
+                    Icon(
+                        imageVector = Icons.Filled.History,
+                        contentDescription = "History"
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
             }
-        } else {
-            Spacer(modifier = Modifier.size(48.dp))
+
+            if (showSettings) {
+                IconButton(onClick = onSettings) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings"
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
+            }
         }
     }
 }
@@ -329,68 +374,163 @@ private fun NostrLoginScreen(
 }
 
 @Composable
+@Composable
 private fun UploadScreenshotPredictionScreen(
     state: CopilotUiState,
     settings: UserSettings,
+    nostrClient: OpenSignalNostrClient,
+    modifier: Modifier = Modifier,
     onUploadAndPredict: (
         bytes: ByteArray,
         fileName: String,
         mimeType: String
-    ) -> Unit
+    ) -> Unit,
+    onShare: (signal: opensignal.models.TradeSignal, selectedRelays: List<String>) -> Unit = { _, _ -> }
 ) {
+    val scope = rememberCoroutineScope()
     var selectedFile by remember { mutableStateOf<File?>(null) }
     var localError by remember { mutableStateOf<String?>(null) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var isSharing by remember { mutableStateOf(false) }
+    var shareError by remember { mutableStateOf<String?>(null) }
+    var shareSection by remember { mutableStateOf(ShareSection.SIGNAL_OVERVIEW) }
+    var shareContent by remember { mutableStateOf<ShareContent?>(null) }
+    var lastEventId by remember { mutableStateOf<String?>(null) }
+    var lastRelayCount by remember { mutableStateOf(0) }
+    val scrollState = rememberScrollState()
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(ANALYSIS_SYSTEM_PROMPT)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(ANALYSIS_SYSTEM_PROMPT)
 
-            Button(onClick = {
-                val file = pickFile("Select Screenshot")
-                if (file != null && file.exists()) {
-                    selectedFile = file
-                    localError = null
-                } else {
-                    localError = "No screenshot selected."
+                Button(onClick = {
+                    val file = pickFile("Select Screenshot")
+                    if (file != null && file.exists()) {
+                        selectedFile = file
+                        localError = null
+                    } else {
+                        localError = "No screenshot selected."
+                    }
+                }) {
+                    Text("Select Screenshot")
                 }
-            }) {
-                Text("Select Screenshot")
-            }
 
-            Text("Selected: ${selectedFile?.name ?: "None"}")
+                Text("Selected: ${selectedFile?.name ?: "None"}")
 
-            Button(onClick = {
-                val file = selectedFile ?: return@Button
-                val bytes = readFileBytes(file)
-                if (bytes == null) {
-                    localError = "Unable to read selected screenshot."
-                    return@Button
+                Button(onClick = {
+                    val file = selectedFile ?: return@Button
+                    val bytes = readFileBytes(file)
+                    if (bytes == null) {
+                        localError = "Unable to read selected screenshot."
+                        return@Button
+                    }
+                    onUploadAndPredict(bytes, file.name, guessMimeType(file.name))
+                }, enabled = selectedFile != null && !state.isLoading) {
+                    Text(if (state.isLoading) "Analyzing..." else "Analyze Screenshot")
                 }
-                onUploadAndPredict(bytes, file.name, guessMimeType(file.name))
-            }, enabled = selectedFile != null && !state.isLoading) {
-                Text(if (state.isLoading) "Analyzing..." else "Analyze Screenshot")
+                localError?.let { Text("Error: $it") }
+                state.error?.let { Text("Error: $it") }
             }
-            localError?.let { Text("Error: $it") }
-            state.error?.let { Text("Error: $it") }
+        }
+
+        state.latestAnalysis?.let { analysis ->
+            DesktopAnalysisPanel(
+                analysis = analysis,
+                settings = settings,
+                isLoggedIn = state.authSession != null,
+                onShare = { signal, selectedRelays ->
+                    showShareDialog = false
+                    isSharing = true
+                    shareError = null
+                    onShare(signal, selectedRelays)
+                    isSharing = false
+                },
+                onShowShare = { section ->
+                    shareSection = section
+                    shareContent = buildShareContent(analysis, section)
+                    showShareDialog = true
+                }
+            )
         }
     }
 
     state.latestAnalysis?.let { analysis ->
-        DesktopAnalysisPanel(
-            analysis = analysis,
-            settings = settings
-        )
+        if (showShareDialog && analysis.signal != null) {
+            val content = shareContent ?: buildShareContent(analysis, shareSection)
+            ShareSignalDialog(
+                shareTitle = content.title,
+                shareSubtitle = content.subtitle,
+                shareSummary = content.summary,
+                shareDetails = content.details,
+                availableRelays = settings.preferredRelays,
+                onShare = { selectedRelays, format ->
+                    isSharing = true
+                    shareError = null
+                    scope.launch {
+                        try {
+                            if (nostrClient != null) {
+                                // Emit Nostr signal share event to selected relays
+                                val published = nostrClient.shareSignalToRelays(
+                                    signal = analysis.signal,
+                                    selectedRelays = selectedRelays
+                                )
+                                lastEventId = published.eventId
+                                lastRelayCount = published.relays.size
+                                showShareDialog = false
+                            } else {
+                                shareError = "Nostr client not available"
+                            }
+                        } catch (e: Exception) {
+                            shareError = e.message ?: "Failed to share signal"
+                        } finally {
+                            isSharing = false
+                        }
+                    }
+                },
+                onDismiss = { showShareDialog = false },
+                isSharing = isSharing,
+                shareError = shareError,
+                defaultFormat = if (shareSection == ShareSection.SIGNAL_OVERVIEW) {
+                    ShareFormat.FULL_SIGNAL
+                } else {
+                    ShareFormat.TEXT_NOTE
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun DesktopAnalysisPanel(
+internal fun DesktopAnalysisPanel(
     analysis: opensignal.models.CopilotAnalysis,
-    settings: UserSettings
+    settings: UserSettings,
+    isLoggedIn: Boolean = false,
+    onShare: (signal: opensignal.models.TradeSignal, selectedRelays: List<String>) -> Unit = { _, _ -> },
+    onShowShare: (ShareSection) -> Unit = {}
 ) {
     val technical = analysis.signal.technical
     val fundamental = analysis.signal.fundamental
     val plan = analysis.signal.tradePlan
+    val canShare = isLoggedIn && settings.preferredRelays.isNotEmpty()
+    val shareAction: (ShareSection) -> (@Composable () -> Unit)? = { section ->
+        if (canShare) {
+            {
+                ShareButton(
+                    onClick = { onShowShare(section) },
+                    enabled = true,
+                    label = "Share"
+                )
+            }
+        } else {
+            null
+        }
+    }
     val trendColor = when (technical.trend) {
         TrendDirection.BULLISH -> Bullish
         TrendDirection.BEARISH -> Bearish
@@ -405,7 +545,8 @@ private fun DesktopAnalysisPanel(
             SectionHeader(
                 title = "Signal Overview",
                 subtitle = formatTimestamp(analysis.signal.generatedAtIso),
-                accent = LuxuryGold
+                accent = LuxuryGold,
+                action = shareAction(ShareSection.SIGNAL_OVERVIEW)
             )
             StatPillRow(
                 items = listOf(
@@ -433,9 +574,14 @@ private fun DesktopAnalysisPanel(
         colors = CardDefaults.cardColors(containerColor = luxuryPanelAltColor())
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHeader(title = "Trade Plan", accent = LuxuryGold)
+            SectionHeader(
+                title = "Trade Plan",
+                subtitle = "",
+                accent = LuxuryGold,
+                action = shareAction(ShareSection.TRADE_PLAN)
+            )
             TradeOptionList(title = "Buy Options", options = plan.buyOptions)
-            Divider(color = luxuryBorderColor())
+            HorizontalDivider(color = luxuryBorderColor())
             TradeOptionList(title = "Sell Options", options = plan.sellOptions)
         }
     }
@@ -451,7 +597,8 @@ private fun DesktopAnalysisPanel(
                 title = "Technical Summary",
                 subtitle = technical.summary,
                 accent = LuxuryGold,
-                maxLines = 3
+                maxLines = 3,
+                action = shareAction(ShareSection.TECHNICAL_SUMMARY)
             )
             Text("Structure events: ${technical.structureEvents.size}")
             Text("Liquidity sweeps: ${technical.liquiditySweeps.size}")
@@ -470,7 +617,8 @@ private fun DesktopAnalysisPanel(
                 title = "Fundamental Summary",
                 subtitle = fundamental.summary,
                 accent = LuxuryGold,
-                maxLines = 3
+                maxLines = 3,
+                action = shareAction(ShareSection.FUNDAMENTAL_SUMMARY)
             )
             Text("Overall bias: ${fundamental.overallBias.name}")
             Text("Score: ${formatPercent(fundamental.score)}")
@@ -491,7 +639,12 @@ private fun DesktopAnalysisPanel(
             shape = MaterialTheme.shapes.medium
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SectionHeader(title = "Nostr Publish", subtitle = "Event ${published.eventId}", accent = LuxuryGold)
+                SectionHeader(
+                    title = "Nostr Publish",
+                    subtitle = "Event ${published.eventId}",
+                    accent = LuxuryGold,
+                    action = shareAction(ShareSection.NOSTR_PUBLISH)
+                )
                 Text(
                     "Relays: ${published.relays.joinToString(", ")}",
                     maxLines = 2,
@@ -508,17 +661,25 @@ private fun SectionHeader(
     title: String,
     subtitle: String?,
     accent: androidx.compose.ui.graphics.Color,
-    maxLines: Int = 2
+    maxLines: Int = 2,
+    action: (@Composable () -> Unit)? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CandleIcon(color = accent)
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CandleIcon(color = accent)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            action?.invoke()
         }
         if (!subtitle.isNullOrBlank()) {
             Text(
