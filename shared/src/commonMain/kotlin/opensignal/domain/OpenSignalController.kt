@@ -3,6 +3,7 @@ package opensignal.domain
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import opensignal.models.AnalysisHistoryEntry
 import opensignal.models.AuthSession
 import opensignal.models.CopilotAnalysis
 import opensignal.models.ScreenshotPayload
@@ -13,6 +14,7 @@ data class CopilotUiState(
     val isLoading: Boolean = false,
     val authSession: AuthSession? = null,
     val latestAnalysis: CopilotAnalysis? = null,
+    val analysisHistory: List<AnalysisHistoryEntry> = emptyList(),
     val error: String? = null
 )
 
@@ -24,6 +26,7 @@ class OpenSignalController(
 
     private val mutableState = MutableStateFlow(CopilotUiState())
     val state: StateFlow<CopilotUiState> = mutableState
+    private val maxHistoryEntries = 50
 
     suspend fun loginWithNsec(nsec: String, relayHint: String?) {
         runAndCapture {
@@ -75,7 +78,19 @@ class OpenSignalController(
                     userContext = userContext
                 )
             )
-            mutableState.update { it.copy(latestAnalysis = response.analysis) }
+            val entry = AnalysisHistoryEntry(
+                id = response.analysis.signal.id,
+                analysis = response.analysis,
+                createdAtIso = response.analysis.signal.generatedAtIso
+            )
+            mutableState.update { current ->
+                val filteredHistory = current.analysisHistory.filterNot { it.id == entry.id }
+                val updatedHistory = listOf(entry) + filteredHistory
+                current.copy(
+                    latestAnalysis = response.analysis,
+                    analysisHistory = updatedHistory.take(maxHistoryEntries)
+                )
+            }
         }
     }
 
@@ -101,12 +116,34 @@ class OpenSignalController(
 
     fun logout() {
         mutableState.update {
-            it.copy(authSession = null, latestAnalysis = null, error = null)
+            it.copy(authSession = null, latestAnalysis = null, analysisHistory = emptyList(), error = null)
         }
     }
 
     fun reportError(message: String) {
         mutableState.update { it.copy(error = message) }
+    }
+
+    fun toggleHistoryTraining(entryId: String, enabled: Boolean) {
+        mutableState.update { current ->
+            current.copy(
+                analysisHistory = current.analysisHistory.map { entry ->
+                    if (entry.id == entryId) entry.copy(queuedForTraining = enabled) else entry
+                }
+            )
+        }
+    }
+
+    fun removeHistoryEntry(entryId: String) {
+        mutableState.update { current ->
+            current.copy(
+                analysisHistory = current.analysisHistory.filterNot { it.id == entryId }
+            )
+        }
+    }
+
+    fun clearHistory() {
+        mutableState.update { it.copy(analysisHistory = emptyList()) }
     }
 
     private suspend fun runAndCapture(block: suspend () -> Unit) {
