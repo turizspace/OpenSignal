@@ -25,7 +25,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +35,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +82,7 @@ import opensignal.domain.ScreenshotUploader
 import opensignal.domain.parseTimeframeOrDefault
 import opensignal.models.LoginMethod
 import opensignal.models.ScreenshotPayload
+import opensignal.models.ShareSection
 import opensignal.models.TradeOption
 import opensignal.models.TradeSide
 import opensignal.models.TrendDirection
@@ -95,6 +97,12 @@ import opensignal.ui.login.NsecLoginCard
 import opensignal.android.R
 import opensignal.ui.settings.ModelTarget
 import opensignal.ui.settings.SettingsScreen
+import opensignal.ui.components.AndroidShareSignalDialog
+import opensignal.ui.components.AndroidShareCompleteDialog
+import opensignal.ui.components.AndroidShareButton
+import opensignal.ui.history.AndroidHistoryScreen
+import opensignal.ui.share.ShareContent
+import opensignal.ui.share.buildShareContent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,7 +170,8 @@ private fun updateModelOverrides(target: MutableMap<String, String>, settings: U
 private enum class AndroidRoute {
     LOGIN,
     UPLOAD,
-    SETTINGS
+    SETTINGS,
+    HISTORY
 }
 
 private const val ANALYSIS_SYSTEM_PROMPT =
@@ -251,7 +260,8 @@ private fun AndroidAppShell() {
             AndroidCopilotScreen(
                 controller = controller,
                 settingsRepository = settingsRepository,
-                authStore = authStore
+                authStore = authStore,
+                nostrClient = nostrClient
             )
         }
     }
@@ -261,7 +271,8 @@ private fun AndroidAppShell() {
 private fun AndroidCopilotScreen(
     controller: OpenSignalController,
     settingsRepository: SettingsRepository,
-    authStore: SecureAuthStore
+    authStore: SecureAuthStore,
+    nostrClient: NostrClient
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -315,18 +326,20 @@ private fun AndroidCopilotScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         TopBar(
             title = when (route) {
                 AndroidRoute.SETTINGS -> "Settings"
+                AndroidRoute.HISTORY -> "History"
                 else -> "OpenSignal"
             },
             showSettings = route == AndroidRoute.UPLOAD,
             onSettings = { route = AndroidRoute.SETTINGS },
-            showBack = route == AndroidRoute.SETTINGS,
+            showHistory = route == AndroidRoute.UPLOAD,
+            onHistory = { route = AndroidRoute.HISTORY },
+            showBack = route == AndroidRoute.SETTINGS || route == AndroidRoute.HISTORY,
             onBack = { route = AndroidRoute.UPLOAD }
         )
 
@@ -378,6 +391,8 @@ private fun AndroidCopilotScreen(
             AndroidRoute.UPLOAD -> UploadScreenshotPredictionScreen(
                 state = state,
                 settings = settings,
+                modifier = Modifier.weight(1f),
+                nostrClient = nostrClient,
                 onUploadAndPredict = { bytes, fileName, mimeType ->
                     scope.launch {
                         controller.uploadScreenshotForPrediction(
@@ -412,6 +427,16 @@ private fun AndroidCopilotScreen(
                     queryDisplayName(context, uri)
                 }
             )
+
+            AndroidRoute.HISTORY -> AndroidHistoryScreen(
+                history = state.analysisHistory,
+                settings = settings,
+                isLoggedIn = state.authSession != null,
+                onToggleTraining = { entryId, enabled ->
+                    controller.toggleHistoryTraining(entryId, enabled)
+                },
+                onClearHistory = { controller.clearHistory() }
+            )
         }
     }
 }
@@ -421,6 +446,8 @@ private fun TopBar(
     title: String,
     showSettings: Boolean,
     onSettings: () -> Unit,
+    showHistory: Boolean,
+    onHistory: () -> Unit,
     showBack: Boolean,
     onBack: () -> Unit
 ) {
@@ -432,7 +459,7 @@ private fun TopBar(
         if (showBack) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.Filled.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back"
                 )
             }
@@ -446,15 +473,28 @@ private fun TopBar(
             modifier = Modifier.weight(1f)
         )
 
-        if (showSettings) {
-            IconButton(onClick = onSettings) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings"
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (showHistory) {
+                IconButton(onClick = onHistory) {
+                    Icon(
+                        imageVector = Icons.Filled.History,
+                        contentDescription = "History"
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
             }
-        } else {
-            Spacer(modifier = Modifier.size(48.dp))
+
+            if (showSettings) {
+                IconButton(onClick = onSettings) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Settings"
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
+            }
         }
     }
 }
@@ -480,6 +520,8 @@ private fun NostrLoginScreen(
 private fun UploadScreenshotPredictionScreen(
     state: CopilotUiState,
     settings: UserSettings,
+    modifier: Modifier = Modifier,
+    nostrClient: NostrClient? = null,
     onUploadAndPredict: (
         bytes: ByteArray,
         fileName: String,
@@ -488,10 +530,21 @@ private fun UploadScreenshotPredictionScreen(
     onUpdateSettings: ((UserSettings) -> UserSettings) -> Unit
 ) {
     val context = LocalContext.current
+    val composeScope = rememberCoroutineScope()
     var selectedBytes by remember { mutableStateOf<ByteArray?>(null) }
     var selectedName by remember { mutableStateOf<String?>(null) }
     var selectedMime by remember { mutableStateOf<String?>(null) }
     var localError by remember { mutableStateOf<String?>(null) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var isSharing by remember { mutableStateOf(false) }
+    var shareError by remember { mutableStateOf<String?>(null) }
+    var showShareComplete by remember { mutableStateOf(false) }
+    var lastEventId by remember { mutableStateOf<String?>(null) }
+    var lastRelayCount by remember { mutableStateOf(0) }
+    var shareSection by remember { mutableStateOf(ShareSection.SIGNAL_OVERVIEW) }
+    var shareContent by remember { mutableStateOf<ShareContent?>(null) }
+    val scrollState = rememberScrollState()
+    
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -507,46 +560,147 @@ private fun UploadScreenshotPredictionScreen(
         localError = null
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(ANALYSIS_SYSTEM_PROMPT)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(ANALYSIS_SYSTEM_PROMPT)
 
-            Button(onClick = { pickImageLauncher.launch("image/*") }) {
-                Text("Select Screenshot")
+                Button(onClick = { pickImageLauncher.launch("image/*") }) {
+                    Text("Select Screenshot")
+                }
+
+                Text("Selected: ${selectedName ?: "None"}")
+
+                Button(onClick = {
+                    val bytes = selectedBytes ?: return@Button
+                    val name = selectedName ?: "screenshot.png"
+                    val mime = selectedMime ?: "image/png"
+                    onUploadAndPredict(bytes, name, mime)
+                }, enabled = selectedBytes != null && !state.isLoading) {
+                    Text(if (state.isLoading) "Analyzing..." else "Analyze Screenshot")
+                }
+
+                localError?.let { Text("Error: $it") }
+                state.error?.let { Text("Error: $it") }
             }
+        }
 
-            Text("Selected: ${selectedName ?: "None"}")
-
-            Button(onClick = {
-                val bytes = selectedBytes ?: return@Button
-                val name = selectedName ?: "screenshot.png"
-                val mime = selectedMime ?: "image/png"
-                onUploadAndPredict(bytes, name, mime)
-            }, enabled = selectedBytes != null && !state.isLoading) {
-                Text(if (state.isLoading) "Analyzing..." else "Analyze Screenshot")
-            }
-
-            localError?.let { Text("Error: $it") }
-            state.error?.let { Text("Error: $it") }
+        state.latestAnalysis?.let { analysis ->
+            AnalysisPanel(
+                analysis = analysis,
+                settings = settings,
+                isLoggedIn = state.authSession != null,
+                onShare = { signal, selectedRelays ->
+                    showShareDialog = false
+                    isSharing = true
+                    shareError = null
+                    try {
+                        lastEventId = signal.id
+                        lastRelayCount = selectedRelays.size
+                        showShareComplete = true
+                        isSharing = false
+                    } catch (e: Exception) {
+                        shareError = e.message ?: "Failed to share signal"
+                        isSharing = false
+                    }
+                },
+                onShowShare = { section ->
+                    shareSection = section
+                    shareContent = buildShareContent(analysis, section)
+                    showShareDialog = true
+                }
+            )
         }
     }
 
     state.latestAnalysis?.let { analysis ->
-        AnalysisPanel(
-            analysis = analysis,
-            settings = settings
-        )
+        if (showShareDialog) {
+            val content = shareContent ?: buildShareContent(analysis, shareSection)
+            AndroidShareSignalDialog(
+                shareTitle = content.title,
+                shareSubtitle = content.subtitle,
+                shareSummary = content.summary,
+                shareDetails = content.details,
+                availableRelays = settings.preferredRelays,
+                onShare = { selectedRelays ->
+                    isSharing = true
+                    shareError = null
+                    // Launch coroutine to publish signal to Nostr relays
+                    composeScope.launch {
+                        try {
+                            if (nostrClient != null) {
+                                // Emit Nostr signal share event to selected relays
+                                val published = nostrClient.shareSignalToRelays(
+                                    signal = analysis.signal,
+                                    selectedRelays = selectedRelays
+                                )
+                                lastEventId = published.eventId
+                                lastRelayCount = published.relays.size
+                                showShareComplete = true
+                                showShareDialog = false
+                            } else {
+                                shareError = "Nostr client not available"
+                            }
+                        } catch (e: Exception) {
+                            shareError = e.message ?: "Failed to publish signal: ${e.localizedMessage}"
+                        } finally {
+                            isSharing = false
+                        }
+                    }
+                },
+                onDismiss = { 
+                    showShareDialog = false 
+                    shareError = null
+                },
+                isSharing = isSharing,
+                shareError = shareError
+            )
+        }
+
+        if (showShareComplete && lastEventId != null) {
+            AndroidShareCompleteDialog(
+                eventId = lastEventId!!,
+                relayCount = lastRelayCount,
+                shareTitle = shareContent?.title ?: "Signal",
+                onDismiss = { 
+                    showShareComplete = false 
+                    lastEventId = null
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun AnalysisPanel(
+internal fun AnalysisPanel(
     analysis: opensignal.models.CopilotAnalysis,
-    settings: UserSettings
+    settings: UserSettings,
+    isLoggedIn: Boolean = false,
+    onShare: (signal: opensignal.models.TradeSignal, selectedRelays: List<String>) -> Unit = { _, _ -> },
+    onShowShare: (ShareSection) -> Unit = {}
 ) {
     val technical = analysis.signal.technical
     val fundamental = analysis.signal.fundamental
     val plan = analysis.signal.tradePlan
+    val canShare = isLoggedIn && settings.preferredRelays.isNotEmpty()
+    val shareAction: (ShareSection) -> (@Composable () -> Unit)? = { section ->
+        if (canShare) {
+            {
+                AndroidShareButton(
+                    onClick = { onShowShare(section) },
+                    enabled = true,
+                    label = "Share"
+                )
+            }
+        } else {
+            null
+        }
+    }
     val trendColor = when (technical.trend) {
         TrendDirection.BULLISH -> Bullish
         TrendDirection.BEARISH -> Bearish
@@ -561,7 +715,8 @@ private fun AnalysisPanel(
             SectionHeader(
                 title = "Signal Overview",
                 subtitle = formatTimestamp(analysis.signal.generatedAtIso),
-                accent = LuxuryGold
+                accent = LuxuryGold,
+                action = shareAction(ShareSection.SIGNAL_OVERVIEW)
             )
             StatPillRow(
                 items = listOf(
@@ -589,9 +744,14 @@ private fun AnalysisPanel(
         colors = CardDefaults.cardColors(containerColor = luxuryPanelAltColor())
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHeader(title = "Trade Plan", subtitle = "", accent = LuxuryGold)
+            SectionHeader(
+                title = "Trade Plan",
+                subtitle = "",
+                accent = LuxuryGold,
+                action = shareAction(ShareSection.TRADE_PLAN)
+            )
             TradeOptionList(title = "Buy Options", options = plan.buyOptions)
-            Divider(color = luxuryBorderColor())
+            HorizontalDivider(color = luxuryBorderColor())
             TradeOptionList(title = "Sell Options", options = plan.sellOptions)
         }
     }
@@ -607,7 +767,8 @@ private fun AnalysisPanel(
                 title = "Technical Summary",
                 subtitle = technical.summary,
                 accent = LuxuryGold,
-                maxLines = 3
+                maxLines = 3,
+                action = shareAction(ShareSection.TECHNICAL_SUMMARY)
             )
             Text("Structure events: ${technical.structureEvents.size}")
             Text("Liquidity sweeps: ${technical.liquiditySweeps.size}")
@@ -626,7 +787,8 @@ private fun AnalysisPanel(
                 title = "Fundamental Summary",
                 subtitle = fundamental.summary,
                 accent = LuxuryGold,
-                maxLines = 3
+                maxLines = 3,
+                action = shareAction(ShareSection.FUNDAMENTAL_SUMMARY)
             )
             Text("Overall bias: ${fundamental.overallBias.name}")
             Text("Score: ${formatPercent(fundamental.score)}")
@@ -651,29 +813,48 @@ private fun AnalysisPanel(
             shape = MaterialTheme.shapes.medium
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SectionHeader(title = "Nostr Publish", subtitle = "Event ${published.eventId}", accent = LuxuryGold)
+                SectionHeader(
+                    title = "Nostr Publish",
+                    subtitle = "Event ${published.eventId}",
+                    accent = LuxuryGold,
+                    action = shareAction(ShareSection.NOSTR_PUBLISH)
+                )
                 Text(
                     "Relays: ${published.relays.joinToString(", ")}",
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall
                 )
-                Text("Published at: ${published.publishedAtIso}")
+                Text("Published at: ${published.publishedAtIso}", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String?, accent: Color, maxLines: Int = 2) {
+private fun SectionHeader(
+    title: String,
+    subtitle: String?,
+    accent: Color,
+    maxLines: Int = 2,
+    action: (@Composable () -> Unit)? = null
+) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CandleIcon(color = accent, modifier = Modifier)
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CandleIcon(color = accent, modifier = Modifier)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            action?.invoke()
         }
         if (!subtitle.isNullOrBlank()) {
             Text(
