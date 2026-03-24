@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Github, Twitter, Zap } from 'lucide-react'
-import { OpenSignalIconSVG } from './OpenSignalLogo'
 
 export default function Footer() {
   const currentYear = new Date().getFullYear()
@@ -33,9 +33,13 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="text-opensignal-gold">
-                <OpenSignalIconSVG size={32} />
-              </div>
+              <Image
+                src="/images/logo-icon.png"
+                alt="OpenSignal"
+                width={32}
+                height={32}
+                className="rounded-md"
+              />
               <span className="gradient-gold-text font-bold text-lg">OpenSignal</span>
             </div>
             <p className="text-opensignal-text-secondary text-sm">
