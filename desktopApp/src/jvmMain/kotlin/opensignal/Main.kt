@@ -78,7 +78,6 @@ import opensignal.models.TradeOption
 import opensignal.models.TradeSide
 import opensignal.models.TrendDirection
 import opensignal.nostr.NostrClient
-import opensignal.nostr.OpenSignalNostrClient
 import opensignal.settings.InMemorySettingsRepository
 import opensignal.settings.SettingsRepository
 import opensignal.settings.ThemeMode
@@ -199,7 +198,7 @@ private class SettingsAwareUploader(
 private fun DesktopCopilotScreen(
     controller: OpenSignalController,
     settingsRepository: SettingsRepository,
-    nostrClient: OpenSignalNostrClient
+    nostrClient: NostrClient
 ) {
     val scope = rememberCoroutineScope()
     val state by controller.state.collectAsState()
@@ -267,9 +266,6 @@ private fun DesktopCopilotScreen(
                             userContext = ANALYSIS_SYSTEM_PROMPT
                         )
                     }
-                },
-                onUpdateSettings = { update ->
-                    scope.launch { settingsRepository.update(update) }
                 },
                 onShare = { signal, selectedRelays ->
                     // Handle share - in the future this could directly publish via nostrClient
@@ -374,11 +370,10 @@ private fun NostrLoginScreen(
 }
 
 @Composable
-@Composable
 private fun UploadScreenshotPredictionScreen(
     state: CopilotUiState,
     settings: UserSettings,
-    nostrClient: OpenSignalNostrClient,
+    nostrClient: NostrClient,
     modifier: Modifier = Modifier,
     onUploadAndPredict: (
         bytes: ByteArray,
