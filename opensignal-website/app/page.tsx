@@ -1,10 +1,10 @@
 'use client'
 
 import { Download, Github, Zap, Sparkles, Shield, Brain } from 'lucide-react'
+import Image from 'next/image'
 import Section from '@/components/Section'
 import FeatureCard from '@/components/FeatureCard'
 import CTAButton from '@/components/CTAButton'
-import { OpenSignalIconSVG } from '@/components/OpenSignalLogo'
 
 const highlights = [
   {
@@ -31,8 +31,15 @@ export default function HomePage() {
       <section className="hero-ambient min-h-screen flex items-center justify-center px-4 py-20">
         <div className="max-w-4xl mx-auto text-center">
           <div className="mb-8 flex justify-center">
-            <div className="text-opensignal-gold">
-              <OpenSignalIconSVG size={120} />
+            <div className="rounded-2xl border border-opensignal-gold/25 bg-opensignal-dark/60 p-4 shadow-lg shadow-opensignal-gold/10">
+              <Image
+                src="/images/logo-icon.png"
+                alt="OpenSignal"
+                width={120}
+                height={120}
+                className="rounded-xl"
+                priority
+              />
             </div>
           </div>
 
