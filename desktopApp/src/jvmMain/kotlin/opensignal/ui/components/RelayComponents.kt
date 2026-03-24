@@ -19,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SurfaceDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -288,7 +287,7 @@ fun RelayStatusIndicator(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = if (hasRelays) Icons.Default.Check else Icons.Default.Error,
+                    imageVector = if (hasRelays) Icons.Default.Check else Icons.Default.CloudOff,
                     contentDescription = "Status",
                     tint = statusColor,
                     modifier = Modifier.padding(4.dp)
