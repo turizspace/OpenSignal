@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
+}
+
+val prop: (String) -> String? = { key -> project.findProperty(key) as String? }
+val appName = prop("APP_NAME") ?: "OpenSignal"
+val appVersionName = prop("APP_VERSION_NAME") ?: "1.0.0"
+val appVersionCode = prop("APP_VERSION_CODE")?.toIntOrNull() ?: 1
+val keystoreProps = Properties().apply {
+    val keystoreFile = rootProject.file("keystore.properties")
+    if (keystoreFile.exists()) {
+        keystoreFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -13,20 +26,23 @@ android {
         applicationId = "opensignal.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
-    val prop: (String) -> String? = { key -> project.findProperty(key) as String? }
     val ksPath = System.getenv("CI_ANDROID_KEYSTORE_PATH")
         ?: prop("CI_ANDROID_KEYSTORE_PATH")
         ?: prop("RELEASE_STORE_FILE")
+        ?: keystoreProps.getProperty("storeFile")?.let { rootProject.file(it).path }
     val ksStorePassword = System.getenv("CI_ANDROID_KEYSTORE_PASSWORD")
         ?: prop("RELEASE_STORE_PASSWORD")
+        ?: keystoreProps.getProperty("storePassword")
     val ksKeyAlias = System.getenv("CI_ANDROID_KEY_ALIAS")
         ?: prop("RELEASE_KEY_ALIAS")
+        ?: keystoreProps.getProperty("keyAlias")
     val ksKeyPassword = System.getenv("CI_ANDROID_KEY_PASSWORD")
         ?: prop("RELEASE_KEY_PASSWORD")
+        ?: keystoreProps.getProperty("keyPassword")
     val hasReleaseSigning = ksPath != null && ksStorePassword != null && ksKeyAlias != null && ksKeyPassword != null
     val needsRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
     val isCi = (System.getenv("CI") ?: prop("CI"))?.toBoolean() == true
