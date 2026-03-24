@@ -44,7 +44,7 @@ const downloadOptions: DownloadOption[] = [
   },
 ]
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -104,7 +104,7 @@ export default function DownloadPage() {
                         {option.file}
                       </p>
                     </div>
-                    <CopyButton text={option.file} label="Copy filename" />
+                    <CopyButton text={option.file} />
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-opensignal-text-secondary">
@@ -173,7 +173,7 @@ export default function DownloadPage() {
               </ol>
               <div className="mt-6 p-4 bg-opensignal-gold/5 border border-opensignal-gold/20 rounded-lg">
                 <p className="text-opensignal-text-secondary text-sm">
-                  <strong>Note:</strong> If you encounter "Unknown sources" warning, 
+                  <strong>Note:</strong> If you encounter &quot;Unknown sources&quot; warning,
                   enable installation from unknown sources in your security settings.
                 </p>
               </div>

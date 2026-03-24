@@ -39,7 +39,7 @@ export default function TermsPage() {
               3. Disclaimer of Warranties
             </h3>
             <p className="text-opensignal-text-secondary leading-relaxed">
-              OpenSignal is provided "AS IS" without warranty of any kind, express or implied. We do not warrant that the application will be uninterrupted, error-free, or free of harmful components. Trading signals are provided for informational purposes only and should not be considered financial advice.
+              OpenSignal is provided &quot;AS IS&quot; without warranty of any kind, express or implied. We do not warrant that the application will be uninterrupted, error-free, or free of harmful components. Trading signals are provided for informational purposes only and should not be considered financial advice.
             </p>
           </div>
 

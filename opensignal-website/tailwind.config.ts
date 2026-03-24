@@ -20,7 +20,14 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)'],
+        sans: [
+          '"Space Grotesk"',
+          '"Sora"',
+          '"Manrope"',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+        ],
       },
       backgroundImage: {
         'gradient-gold': 'linear-gradient(135deg, #D4AF37 0%, #E5C158 100%)',

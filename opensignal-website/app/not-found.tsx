@@ -11,7 +11,7 @@ export default function NotFound() {
           Page Not Found
         </h2>
         <p className="text-opensignal-text-secondary mb-8">
-          The page you're looking for doesn't exist or has been moved.
+          The page you’re looking for doesn’t exist or has been moved.
         </p>
         <Link href="/" className="button-gold">
           Back to Home

@@ -1,8 +1,7 @@
 'use client'
 
-import { Download, FileText, Code, BookOpen, Github } from 'lucide-react'
+import { FileText, Code, BookOpen, Github } from 'lucide-react'
 import Section from '@/components/Section'
-import CTAButton from '@/components/CTAButton'
 
 const resources = [
   {

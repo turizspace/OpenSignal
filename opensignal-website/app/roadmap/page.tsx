@@ -1,7 +1,6 @@
 'use client'
 
 import Section from '@/components/Section'
-import CTAButton from '@/components/CTAButton'
 
 export default function RoadmapPage() {
   const roadmapItems = [

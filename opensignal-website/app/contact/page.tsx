@@ -2,7 +2,6 @@
 
 import { Mail, Zap } from 'lucide-react'
 import Section from '@/components/Section'
-import CTAButton from '@/components/CTAButton'
 
 export default function ContactPage() {
   return (

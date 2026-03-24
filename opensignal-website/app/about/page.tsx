@@ -23,7 +23,7 @@ export default function AboutPage() {
             <p className="text-opensignal-text text-lg leading-relaxed">
               Our mission is to democratize professional-grade technical and fundamental 
               analysis by making it accessible, automated, and decentralized. Whether 
-              you're a day trader, swing trader, or long-term investor, OpenSignal 
+              you’re a day trader, swing trader, or long-term investor, OpenSignal 
               provides AI-powered insights to inform your trading decisions.
             </p>
           </div>
