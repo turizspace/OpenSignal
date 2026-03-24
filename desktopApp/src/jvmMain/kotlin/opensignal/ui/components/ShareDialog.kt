@@ -14,7 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogState
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /**
  * Share signal dialog component.
@@ -55,14 +57,17 @@ fun ShareSignalDialog(
     var selectedRelays by remember { mutableStateOf(availableRelays.toSet()) }
     var selectedFormat by remember { mutableStateOf(defaultFormat) }
     
-    Dialog(
-        onDismissRequest = { if (!isSharing) onDismiss() },
-        title = "Share Signal"
+    // Render as a card-based modal overlay
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth(0.6f)
+            .padding(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = 8.dp
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.8f)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
@@ -88,7 +93,7 @@ fun ShareSignalDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // Share summary
                 Text(
@@ -115,7 +120,7 @@ fun ShareSignalDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 // Share format selection
                 Text(
@@ -137,7 +142,7 @@ fun ShareSignalDialog(
                     onSelect = { selectedFormat = ShareFormat.TEXT_NOTE }
                 )
                 
-                Divider()
+                HorizontalDivider()
                 
                 // Relay selection
                 Text(
