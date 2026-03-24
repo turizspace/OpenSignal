@@ -1,0 +1,17 @@
+/**
+ * robots.txt - Search engine crawler instructions
+ */
+
+User-agent: *
+Allow: /
+Disallow: /private/
+
+# Google
+User-agent: Googlebot
+Allow: /
+
+# Bing
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://opensignal.io/sitemap.xml

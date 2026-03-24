@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply transition-colors duration-200;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+}
+
+.site-ambient {
+  position: relative;
+  isolation: isolate;
+}
+
+.site-ambient::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  background-image: url('/images/opensignal-thumbnail.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.08;
+  filter: saturate(1.1) contrast(1.05);
+  transform: scale(1.05);
+  z-index: -2;
+  pointer-events: none;
+}
+
+.site-ambient::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(212, 175, 55, 0.12), transparent 42%),
+    radial-gradient(circle at 90% 0%, rgba(229, 193, 88, 0.1), transparent 45%),
+    linear-gradient(180deg, rgba(15, 15, 15, 0.35) 0%, rgba(15, 15, 15, 0.85) 70%, rgba(15, 15, 15, 1) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.hero-ambient {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.hero-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -8%;
+  background-image: url('/images/opensignal-thumbnail.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.18;
+  filter: saturate(1.15) contrast(1.05);
+  transform: scale(1.04);
+  z-index: -2;
+}
+
+.hero-ambient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(212, 175, 55, 0.18), transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(229, 193, 88, 0.12), transparent 50%),
+    linear-gradient(180deg, rgba(15, 15, 15, 0.6) 0%, rgba(15, 15, 15, 0.95) 70%);
+  z-index: -1;
+}
+
+.gradient-gold {
+  @apply bg-gradient-to-r from-opensignal-gold to-opensignal-gold-light;
+}
+
+.gradient-gold-text {
+  @apply bg-gradient-to-r from-opensignal-gold to-opensignal-gold-light bg-clip-text text-transparent;
+}
+
+.button-gold {
+  @apply px-6 py-3 rounded-lg font-semibold text-opensignal-dark bg-opensignal-gold hover:bg-opensignal-gold-light transition-all duration-200 transform hover:scale-105 active:scale-95;
+}
+
+.button-outline {
+  @apply px-6 py-3 rounded-lg font-semibold border-2 border-opensignal-gold text-opensignal-gold hover:bg-opensignal-gold hover:text-opensignal-dark transition-all duration-200;
+}
+
+/* Smooth glass effect */
+.glass {
+  @apply backdrop-blur-md bg-white/5 border border-white/10;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-opensignal-dark-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-opensignal-gold rounded-full hover:bg-opensignal-gold-light;
+}
