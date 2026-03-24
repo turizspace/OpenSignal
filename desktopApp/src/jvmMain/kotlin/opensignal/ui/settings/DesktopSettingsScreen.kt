@@ -84,7 +84,7 @@ fun DesktopSettingsScreen(
                 }
             }
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             // === Relay Management (NIP-65) ===
             Text("Relay Management (NIP-65)", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -162,7 +162,7 @@ fun DesktopSettingsScreen(
                 Text("Show structure overlays")
             }
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             // === Model Files ===
             Text("AI Model Files", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
@@ -209,7 +209,7 @@ fun DesktopSettingsScreen(
             }) { Text("Select Trend Model") }
             Text("Trend: ${shortPath(settings.trendModelPath)}")
             
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             // === Theme ===
             Text("Appearance", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
