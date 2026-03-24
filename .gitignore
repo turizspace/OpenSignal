@@ -6,7 +6,7 @@ build/
 **/build/
 
 # Android
-local.properties
+*.properties
 *.keystore
 *.jks
 *.apk
